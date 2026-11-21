@@ -81,7 +81,7 @@
         #unity-loading-bar {
             position: absolute;
             left: 50%;
-            top: 50%;
+            top: 64%;
             transform: translate(-50%, -50%);
             display: flex;
             flex-direction: column;
@@ -89,20 +89,18 @@
             z-index: 1000;
         }
         
+        /* The WOW Kids logo is already inside the new background image, so this stays hidden */
         #unity-logo {
-            width: 280px;
-            height: 160px;
-            background: url('TemplateData/wowkids_logo.png') center center / contain no-repeat;
-            margin: 0 auto 20px auto;
-            display: block;
+            display: none;
         }
         
         #unity-progress-bar-empty {
             width: 280px;
             height: 18px;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.55);
             border-radius: 9px;
             overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
         }
         
         #unity-progress-bar-full {
@@ -118,6 +116,35 @@
             margin-top: 15px;
             font-size: 14px;
             text-align: center;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+        }
+        
+        /* ===== TAP TO START (needed so browsers allow sound) ===== */
+        #tap-to-start {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 14vh;
+            z-index: 2000;
+            cursor: pointer;
+            background: rgba(0, 0, 0, 0.15);
+            -webkit-tap-highlight-color: transparent;
+        }
+        #tap-to-start span {
+            background: #4CAF50;
+            color: #fff;
+            font-size: 22px;
+            font-weight: 700;
+            padding: 14px 34px;
+            border-radius: 30px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+            animation: tapPulse 1.2s infinite ease-in-out;
+        }
+        @keyframes tapPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
         }
         
         /* ===== WARNING BANNER ===== */
@@ -238,6 +265,9 @@
         </div>
     </div>
 
+    <!-- Tap to start (unlocks sound) -->
+    <div id="tap-to-start"><span>Tap to start</span></div>
+
     <!-- Unity Container -->
     <div id="unity-container">
         <canvas id="unity-canvas" tabindex="-1"></canvas>
@@ -308,6 +338,15 @@
             productName: "WoW Kids",
             productVersion: "0.0.1",
             showBanner: unityShowBanner,
+            // Hide harmless video retry errors (no popup). Real errors still show.
+            errorHandler: function (message, filename, lineno) {
+                var m = String(message || "");
+                if (m.indexOf("NotSupportedError") !== -1 || m.indexOf("AbortError") !== -1) {
+                    console.warn("Ignored video error:", m);
+                    return true;
+                }
+                return false;
+            },
         };
 
         // ===== MOBILE DETECTION & OPTIMIZATION =====
@@ -395,20 +434,28 @@
             }).then(function(unityInstance) {
                 // Loading complete
                 loadingBar.style.display = "none";
+
+                // "Tap to start": the tap lets the browser play sound
+                var tapScreen = document.querySelector("#tap-to-start");
+                tapScreen.style.display = "flex";
+                var tapped = false;
+                function onTap(e) {
+                    if (tapped) return;
+                    tapped = true;
+                    e.preventDefault();
+                    tapScreen.style.display = "none";
+                    try { unityInstance.SendMessage("StreamingVideoUnlock", "Unlock"); } catch (err) { console.log(err); }
+                    if (isMobile) {
+                        try { requestFullscreen(); lockOrientation(); } catch (err) {}
+                    }
+                }
+                tapScreen.addEventListener("click", onTap);
+                tapScreen.addEventListener("touchend", onTap, { passive: false });
                 
                 // Lock orientation on mobile safely
                 if (isMobile) {
                     lockOrientation();
                     
-                    // Request fullscreen on first touch (mobile) safely
-                    canvas.addEventListener('touchstart', function() {
-                        try {
-                            requestFullscreen();
-                            lockOrientation();
-                        } catch (e) {
-                            console.log('Touch fullscreen restricted by iframe');
-                        }
-                    }, { once: true });
                 }
                 
                 console.log("Unity loaded successfully");
