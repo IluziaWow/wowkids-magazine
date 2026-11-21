@@ -338,6 +338,15 @@
             productName: "WoW Kids",
             productVersion: "0.0.1",
             showBanner: unityShowBanner,
+            // Hide harmless video retry errors (no popup). Real errors still show.
+            errorHandler: function (message, filename, lineno) {
+                var m = String(message || "");
+                if (m.indexOf("NotSupportedError") !== -1 || m.indexOf("AbortError") !== -1) {
+                    console.warn("Ignored video error:", m);
+                    return true;
+                }
+                return false;
+            },
         };
 
         // ===== MOBILE DETECTION & OPTIMIZATION =====
