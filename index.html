@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+    
+    <!-- Mobile app settings -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    
+    <title>Unity WebGL Player | WoW Kids</title>
+    
+    <style>
+        /* ===== RESET & BASE STYLES ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0e1117;
+            position: fixed;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        }
+        
+        /* ===== MAIN CONTAINER ===== */
+        #unity-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #0e1117;
+            position: relative;
+        }
+        
+        /* ===== CANVAS STYLES ===== */
+        #unity-canvas {
+            background: url('TemplateData/webbg.jpeg') center/cover no-repeat;
+            outline: none;
+            cursor: default;
+            display: block;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* DESKTOP: Centered portrait frame (fits 100% window height) */
+        @media (min-width: 768px) {
+            #unity-canvas {
+                height: 100vh !important;
+                height: 100dvh !important;
+                max-height: 100vh !important;
+                width: auto !important;
+                aspect-ratio: 9 / 16;
+                box-shadow: 0 0 50px rgba(0, 0, 0, 0.9);
+            }
+        }
+        
+        /* MOBILE: Fullscreen portrait (fits dynamic viewport avoiding browser bar cutoff) */
+        @media (max-width: 767px) {
+            #unity-canvas {
+                width: 100% !important;
+                height: 100% !important;
+                height: 100dvh !important;
+                position: fixed;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;
+            }
+        }
+        
+        /* ===== LOADING SCREEN ===== */
+        #unity-loading-bar {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        #unity-logo {
+            width: 280px;
+            height: 160px;
+            background: url('TemplateData/wowkids_logo.png') center center / contain no-repeat;
+            margin: 0 auto 20px auto;
+            display: block;
+        }
+        
+        #unity-progress-bar-empty {
+            width: 280px;
+            height: 18px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 9px;
+            overflow: hidden;
+        }
+        
+        #unity-progress-bar-full {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%);
+            border-radius: 9px;
+            transition: width 0.3s ease;
+        }
+        
+        #unity-loading-text {
+            color: #fff;
+            margin-top: 15px;
+            font-size: 14px;
+            text-align: center;
+        }
+        
+        /* ===== WARNING BANNER ===== */
+        #unity-warning {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ff9800;
+            color: #000;
+            padding: 10px;
+            text-align: center;
+            font-size: 14px;
+            display: none;
+            z-index: 999;
+        }
+        
+        /* ===== ROTATION WARNING (Mobile Landscape Only) ===== */
+        #rotation-warning {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: #fff;
+        }
+        
+        .rotate-icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 30px;
+            animation: rotatePhone 2s infinite ease-in-out;
+        }
+        
+        @keyframes rotatePhone {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-90deg); }
+        }
+        
+        .warning-text {
+            font-size: 20px;
+            text-align: center;
+            padding: 0 20px;
+            font-weight: 500;
+        }
+        
+        /* Show rotation warning only on mobile landscape */
+        @media (max-width: 767px) and (orientation: landscape) {
+            #unity-container {
+                display: none !important;
+            }
+            #rotation-warning {
+                display: flex !important;
+            }
+        }
+        
+        /* Hide rotation warning on mobile portrait and desktop */
+        @media (max-width: 767px) and (orientation: portrait),
+               (min-width: 768px) {
+            #rotation-warning {
+                display: none !important;
+            }
+            #unity-container {
+                display: flex !important;
+            }
+        }
+        
+        /* ===== FULLSCREEN BUTTON (Optional) ===== */
+        #unity-fullscreen-button {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            cursor: pointer;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            transition: background 0.3s;
+        }
+        
+        #unity-fullscreen-button:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+        
+        #unity-fullscreen-button svg {
+            width: 24px;
+            height: 24px;
+            fill: #fff;
+        }
+        
+        @media (min-width: 768px) {
+            #unity-fullscreen-button {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Rotation Warning (Mobile Landscape Only) -->
+    <div id="rotation-warning">
+        <div class="rotate-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
+                <path d="M16.48 2.52c3.27 1.55 5.61 4.72 5.97 8.48h1.5C23.44 4.84 18.29 0 12 0l-.66.03 3.81 3.81 1.33-1.32zm-6.25-.77c-.59-.59-1.54-.59-2.12 0L1.75 8.11c-.59.59-.59 1.54 0 2.12l12.02 12.02c.59.59 1.54.59 2.12 0l6.36-6.36c.59-.59.59-1.54 0-2.12L10.23 1.75zm4.6 19.44L2.81 9.17l6.36-6.36 12.02 12.02-6.36 6.36zm-7.31.29C4.25 19.94 1.91 16.76 1.55 13H.05C.56 19.16 5.71 24 12 24l.66-.03-3.81-3.81-1.33 1.32z"/>
+            </svg>
+        </div>
+        <div class="warning-text">
+            Please rotate your device to portrait mode
+        </div>
+    </div>
+
+    <!-- Unity Container -->
+    <div id="unity-container">
+        <canvas id="unity-canvas" tabindex="-1"></canvas>
+        
+        <!-- Loading Screen -->
+        <div id="unity-loading-bar">
+            <div id="unity-logo"></div>
+            <div id="unity-progress-bar-empty">
+                <div id="unity-progress-bar-full"></div>
+            </div>
+            <div id="unity-loading-text">Loading 0%</div>
+        </div>
+        
+        <!-- Warning Banner -->
+        <div id="unity-warning"></div>
+        
+        <!-- Fullscreen Button (Desktop Only) -->
+        <div id="unity-fullscreen-button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        // ===== CONFIGURATION =====
+        var container = document.querySelector("#unity-container");
+        var canvas = document.querySelector("#unity-canvas");
+        var loadingBar = document.querySelector("#unity-loading-bar");
+        var progressBarFull = document.querySelector("#unity-progress-bar-full");
+        var loadingText = document.querySelector("#unity-loading-text");
+        var warningBanner = document.querySelector("#unity-warning");
+        var fullscreenButton = document.querySelector("#unity-fullscreen-button");
+
+        // ===== WARNING BANNER FUNCTION =====
+        function unityShowBanner(msg, type) {
+            function updateBannerVisibility() {
+                warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+            }
+            var div = document.createElement('div');
+            div.innerHTML = msg;
+            warningBanner.appendChild(div);
+            if (type == 'error') {
+                div.style.background = 'red';
+                div.style.padding = '10px';
+            } else {
+                if (type == 'warning') {
+                    div.style.background = 'yellow';
+                    div.style.padding = '10px';
+                }
+                setTimeout(function() {
+                    warningBanner.removeChild(div);
+                    updateBannerVisibility();
+                }, 5000);
+            }
+            updateBannerVisibility();
+        }
+
+        // ===== BUILD CONFIGURATION =====
+        var buildUrl = "Build";
+        var loaderUrl = buildUrl + "/WowKidsWeb.loader.js";
+        var config = {
+            dataUrl: buildUrl + "/WowKidsWeb.data.unityweb",
+            frameworkUrl: buildUrl + "/WowKidsWeb.framework.js.unityweb",
+            codeUrl: buildUrl + "/WowKidsWeb.wasm.unityweb",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "Iluzia Lab",
+            productName: "WoW Kids",
+            productVersion: "0.0.1",
+            showBanner: unityShowBanner,
+        };
+
+        // ===== MOBILE DETECTION & OPTIMIZATION =====
+        var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+            // Optimize for mobile performance
+            config.devicePixelRatio = Math.min(window.devicePixelRatio, 2);
+            
+            // Prevent iOS elastic scrolling
+            document.body.addEventListener('touchmove', function(e) {
+                if (e.target === canvas) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
+            // Prevent double-tap zoom
+            var lastTouchEnd = 0;
+            document.addEventListener('touchend', function(e) {
+                var now = Date.now();
+                if (now - lastTouchEnd <= 300) {
+                    e.preventDefault();
+                }
+                lastTouchEnd = now;
+            }, false);
+        }
+
+        // ===== ORIENTATION LOCK (Mobile) =====
+        function lockOrientation() {
+            if (!isMobile) return;
+            try {
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('portrait').catch(function(error) {
+                        console.log('Orientation lock not supported or restricted:', error);
+                    });
+                } else if (screen.lockOrientation) {
+                    screen.lockOrientation('portrait');
+                } else if (screen.mozLockOrientation) {
+                    screen.mozLockOrientation('portrait');
+                } else if (screen.msLockOrientation) {
+                    screen.msLockOrientation('portrait');
+                }
+            } catch (e) {
+                console.log('Orientation lock restricted by host iframe');
+            }
+        }
+
+        // ===== FULLSCREEN FUNCTIONS =====
+        function requestFullscreen() {
+            try {
+                if (canvas.requestFullscreen) {
+                    var p = canvas.requestFullscreen();
+                    if (p && p.catch) p.catch(function(e) { console.log('Fullscreen restricted:', e); });
+                } else if (canvas.mozRequestFullScreen) {
+                    canvas.mozRequestFullScreen();
+                } else if (canvas.webkitRequestFullscreen) {
+                    canvas.webkitRequestFullscreen();
+                } else if (canvas.msRequestFullscreen) {
+                    canvas.msRequestFullscreen();
+                }
+            } catch (e) {
+                console.log('Fullscreen restricted by host iframe');
+            }
+        }
+
+        // Fullscreen button click handler
+        if (fullscreenButton) {
+            fullscreenButton.onclick = function() {
+                requestFullscreen();
+            };
+        }
+
+        // ===== LOAD UNITY =====
+        loadingBar.style.display = "block";
+
+        var script = document.createElement("script");
+        script.src = loaderUrl;
+        
+        script.onload = function() {
+            createUnityInstance(canvas, config, function(progress) {
+                // Update progress bar
+                progressBarFull.style.width = (100 * progress) + "%";
+                loadingText.textContent = "Loading " + Math.round(progress * 100) + "%";
+            }).then(function(unityInstance) {
+                // Loading complete
+                loadingBar.style.display = "none";
+                
+                // Lock orientation on mobile safely
+                if (isMobile) {
+                    lockOrientation();
+                    
+                    // Request fullscreen on first touch (mobile) safely
+                    canvas.addEventListener('touchstart', function() {
+                        try {
+                            requestFullscreen();
+                            lockOrientation();
+                        } catch (e) {
+                            console.log('Touch fullscreen restricted by iframe');
+                        }
+                    }, { once: true });
+                }
+                
+                console.log("Unity loaded successfully");
+            }).catch(function(message) {
+                console.warn("Unity notice: " + message);
+            });
+        };
+        
+        script.onerror = function() {
+            alert("Failed to load Unity files. Please check your internet connection and refresh the page.");
+        };
+        
+        document.body.appendChild(script);
+
+        // ===== EVENT LISTENERS =====
+        
+        // Handle orientation changes
+        window.addEventListener('orientationchange', function() {
+            if (isMobile) {
+                setTimeout(function() {
+                    lockOrientation();
+                }, 100);
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (isMobile) {
+                lockOrientation();
+            }
+        });
+        
+        // Prevent context menu on canvas
+        canvas.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+        
+        // ===== VISIBILITY CHANGE (Pause/Resume) =====
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                // Tab is hidden - Unity will pause automatically
+                console.log("Tab hidden");
+            } else {
+                // Tab is visible again
+                console.log("Tab visible");
+            }
+        });
+    </script>
+</body>
+</html>
